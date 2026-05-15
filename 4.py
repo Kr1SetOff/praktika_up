@@ -2,6 +2,8 @@ import sqlite3
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
+from datetime import datetime
+import calendar
 
 conn = sqlite3.connect('3.db')
 cursor = conn.cursor()
@@ -104,7 +106,11 @@ def login():
                    (login_or_email, login_or_email))
     user = cursor.fetchone()
 
-    if user and user[1] == password:
+    if login_or_email == "admin" and password == "admin":
+        log_window.destroy()
+        reg_log.destroy()
+        open_admin(user[0])
+    elif user and user[1] == password:
         log_window.destroy()
         reg_log.destroy()
         open_main(user[0])
@@ -131,6 +137,172 @@ def open_log():
     tk.Button(log_window, text="Войти", command=login,
               bg="blue", fg="white", width=25, height=2).pack(pady=30)
 
+def open_admin(username):
+    def basedate():
+        admin_window.destroy()
+        bd = tk.Tk()
+        bd.title("Управление бд")
+        bd.geometry("900x600")
+
+        notebook = ttk.Notebook(bd)
+        notebook.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+        frame1 = ttk.Frame(notebook)
+        frame2 = ttk.Frame(notebook)
+        frame3 = ttk.Frame(notebook)
+        frame4 = ttk.Frame(notebook)
+        frame5 = ttk.Frame(notebook)
+        frame6 = ttk.Frame(notebook)
+        frame7 = ttk.Frame(notebook)
+        notebook.add(frame1, text="Барбершоп")
+        notebook.add(frame2, text="Сотрудник")
+        notebook.add(frame3, text="Услуги")
+        notebook.add(frame4, text="Записи клиентов")
+        notebook.add(frame5, text="Клиент")
+        notebook.add(frame6, text="Доп_Услуги")
+        notebook.add(frame7, text="Расписание")
+        def show_table(frame, table_name):
+            for widget in frame.winfo_children():
+                widget.destroy()
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            columns_info = cursor.fetchall()
+            columns = []
+            for col in columns_info:
+                columns.append(col[1])
+            tree = ttk.Treeview(frame, columns=columns, show='headings')
+            for col in columns:
+                tree.heading(col, text=col)
+                tree.column(col, width=100)
+            tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            btn_frame = ttk.Frame(frame)
+            btn_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
+            btn_refresh = ttk.Button(btn_frame, text="Обновить",
+                                     command=lambda: load_data(tree, table_name))
+            btn_refresh.pack(side=tk.LEFT, padx=5)
+            btn_add = ttk.Button(btn_frame, text="Добавить",
+                                 command=lambda: add_new(tree, table_name, columns))
+            btn_add.pack(side=tk.LEFT, padx=5)
+            btn_edit = ttk.Button(btn_frame, text="Изменить",
+                                  command=lambda: edit_selected(tree, table_name, columns))
+            btn_edit.pack(side=tk.LEFT, padx=5)
+            btn_delete = ttk.Button(btn_frame, text="Удалить",
+                                    command=lambda: delete_selected(tree, table_name))
+            btn_delete.pack(side=tk.LEFT, padx=5)
+            load_data(tree, table_name)
+        def load_data(tree, table_name):
+            for row in tree.get_children():
+                tree.delete(row)
+            cursor.execute(f"SELECT * FROM {table_name}")
+            data = cursor.fetchall()
+            for row in data:
+                tree.insert('', tk.END, values=row)
+        def add_new(tree, table_name, columns):
+            window = tk.Toplevel(bd)
+            window.title(f"Добавить запись")
+            window.geometry("300x400")
+            entries = []
+            for i, col in enumerate(columns):
+                ttk.Label(window, text=col).pack(pady=3)
+                entry = ttk.Entry(window)
+                entry.pack(pady=3)
+                entries.append(entry)
+            def save():
+                values = []
+                for entry in entries:
+                    values.append(entry.get())
+                if "" in values:
+                    messagebox.showwarning("Ошибка", "Заполните все поля!")
+                    return
+
+                placeholders = ','.join(['?' for _ in columns])
+                columns_names = ','.join(columns)
+
+                try:
+                    cursor.execute(f"INSERT INTO {table_name} ({columns_names}) VALUES ({placeholders})", values)
+                    conn.commit()
+                    load_data(tree, table_name)
+                    window.destroy()
+                    messagebox.showinfo("Готово", "Запись добавлена!")
+                except Exception as e:
+                    messagebox.showerror("Ошибка", str(e))
+
+            ttk.Button(window, text="Сохранить", command=save).pack(pady=20)
+
+        def edit_selected(tree, table_name, columns):
+            selected = tree.selection()
+            if not selected:
+                messagebox.showwarning("Ошибка", "Выберите строку для изменения!")
+                return
+
+            values = tree.item(selected[0])['values']
+            window = tk.Toplevel(bd)
+            window.title(f"Изменить запись")
+            window.geometry("300x400")
+            entries = []
+            for i, col in enumerate(columns):
+                ttk.Label(window, text=col).pack(pady=3)
+                entry = ttk.Entry(window)
+                entry.insert(0, values[i])
+                entry.pack(pady=3)
+                entries.append(entry)
+            def save():
+                new_values = []
+                for entry in entries:
+                    new_values.append(entry.get())
+                updates = []
+                for i in range(1, len(columns)):
+                    updates.append(f"{columns[i]} = ?")
+
+                update_str = ', '.join(updates)
+
+                try:
+                    cursor.execute(f"UPDATE {table_name} SET {update_str} WHERE {columns[0]} = ?",
+                                   new_values[1:] + [new_values[0]])
+                    conn.commit()
+                    load_data(tree, table_name)
+                    window.destroy()
+                    messagebox.showinfo("Готово", "Запись изменена!")
+                except Exception as e:
+                    messagebox.showerror("Ошибка", str(e))
+
+            ttk.Button(window, text="Сохранить", command=save).pack(pady=20)
+        def delete_selected(tree, table_name):
+            selected = tree.selection()
+            if not selected:
+                messagebox.showwarning("Ошибка", "Выберите строку для удаления!")
+                return
+            if messagebox.askyesno("Подтверждение", "Удалить выбранную запись?"):
+                values = tree.item(selected[0])['values']
+                id_value = values[0]
+                id_column = tree['columns'][0]
+
+                try:
+                    cursor.execute(f"DELETE FROM {table_name} WHERE {id_column} = ?", (id_value,))
+                    conn.commit()
+                    load_data(tree, table_name)
+                    messagebox.showinfo("Готово", "Запись удалена!")
+                except Exception as e:
+                    messagebox.showerror("Ошибка", str(e))
+
+        show_table(frame1, "barbershops")
+        show_table(frame2, "sotrudniki")
+        show_table(frame3, "services")
+        show_table(frame4, "zapisi")
+        show_table(frame5, "clients")
+        show_table(frame6, "dop_services")
+        show_table(frame7, "schedules")
+
+        bd.mainloop()
+    admin_window = tk.Tk()
+    admin_window.title("Главное окно")
+    admin_window.geometry("400x300")
+    admin_window.resizable(width=0, height=0)
+
+    tk.Label(text=f"Добро пожаловать, {username}!").pack(pady=50)
+
+    tk.Button(text="Управление бд", command=basedate, bg="green", fg="white", width=20, height=2).pack(pady=15)
+    tk.Button(text="Выйти", command=lambda: close_main(admin_window), bg="red", fg="white", width=20, height=2).pack(pady=15)
+
+    admin_window.mainloop()
 
 def open_main(username):
     def zapis():
@@ -168,8 +340,6 @@ def open_main(username):
             calendar_frame = tk.Frame(time_win)
             calendar_frame.pack(pady=5)
 
-            from datetime import datetime, timedelta
-            import calendar
 
             current_date = datetime.now()
             current_year = current_date.year
