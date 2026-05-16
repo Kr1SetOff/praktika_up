@@ -172,21 +172,21 @@ def open_admin(username):
             for col in columns:
                 tree.heading(col, text=col)
                 tree.column(col, width=100)
-            tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            tree.pack(fill=tk.BOTH, expand=True)
             btn_frame = ttk.Frame(frame)
             btn_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
             btn_refresh = ttk.Button(btn_frame, text="Обновить",
                                      command=lambda: load_data(tree, table_name))
-            btn_refresh.pack(side=tk.LEFT, padx=5)
+            btn_refresh.pack(padx=5, side=tk.LEFT)
             btn_add = ttk.Button(btn_frame, text="Добавить",
                                  command=lambda: add_new(tree, table_name, columns))
-            btn_add.pack(side=tk.LEFT, padx=5)
+            btn_add.pack(padx=5, side=tk.LEFT)
             btn_edit = ttk.Button(btn_frame, text="Изменить",
                                   command=lambda: edit_selected(tree, table_name, columns))
-            btn_edit.pack(side=tk.LEFT, padx=5)
+            btn_edit.pack(padx=5, side=tk.RIGHT)
             btn_delete = ttk.Button(btn_frame, text="Удалить",
                                     command=lambda: delete_selected(tree, table_name))
-            btn_delete.pack(side=tk.LEFT, padx=5)
+            btn_delete.pack(padx=5, side=tk.RIGHT)
             load_data(tree, table_name)
         def load_data(tree, table_name):
             for row in tree.get_children():
